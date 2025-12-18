@@ -1,0 +1,752 @@
+
+以下是一份完整且可落地的開發規格書，針對「結合地圖功能，協助 4–16 歲學生學習英文單字與句子」的產品。內容涵蓋需求、架構、資料模型、API、測試與里程碑，並特別納入你指定的**KK 音標、母音變化、字根字首記憶法、例句（含詞性/時態/文法）**等學習元素。
+
+
+1. 專案總覽（Project Overview）
+專案名稱：MapWords（工作名稱）
+目標族群：4–16 歲學生（含家長與教師後台）
+核心目標：透過地圖互動場景（地點/路線/情境任務），遊戲化地學英文單字與句子，形成長期可視化學習進度。
+平台：Web（Desktop/Tablet/Mobile）、iOS/Android（建議採跨平台 React Native 或 Flutter）
+
+
+2. 使用情境與角色（Personas & Use Cases）
+2.1 角色
+
+幼兒學習者（4–8歲）：看圖、點地點、聽發音、玩配對。
+國小高年級/國中（9–12歲）：在地圖上完成找地點/路線任務，用簡單句子描述行動。
+高中（13–16歲）：完成複雜任務（問路、規劃一日時程），練習對話與文法。
+家長：查看學習進度、設定時間與內容限制。
+教師：指派任務、建立課程包、追蹤班級表現。
+2.2 核心使用情境
+
+POI 單字學習：點選地圖上的地點標記（park、library、museum…）→ 顯示單字、KK 音標、發音、例句與字源提示。
+路線任務：系統給任務「Find the shortest route to the library」→ 學生規劃路線，途中解鎖單字卡。
+情境對話：在「bus stop」情境下，以引導式對話完成「Ask for directions to the museum」。
+發音練習：跟讀錄音 + TTS 參考 → 系統提供發音評分與回饋。
+
+
+3. 需求範圍（Scope & Out of Scope）
+3.1 In Scope
+
+地圖瀏覽、POI 標記、路線規劃與任務流程。
+英文內容模組（KK 音標、母音變化、字根字首、例句/詞性/時態/文法註解）。
+發音（Text-to-Speech）與口說評分（Speech-to-Text + Pronunciation）。
+遊戲化（積分、徽章、每日任務、連續登入）。
+家長/教師後台與報表。
+隱私保護與兒少合規（詳見 §10）。
+3.2 Out of Scope（首版不含）
+
+實時多人連線對戰。
+全國性排名與社群功能。
+大量離線地圖快取（僅提供基本緩存）。
+
+
+4. 功能需求（Functional Requirements）
+4.1 地圖與任務（Azure Maps）
+
+顯示互動式地圖（街道/衛星/標註圖層）。
+POI 標記（學習點）：支援客製圖示、分類（公共場所/交通/自然/商店…）。
+路線規劃：單點/多點、步行/搭車、時間/距離估算。
+任務驅動：系統派送「找地點、走路線、完成對話」三類任務。
+4.2 單字卡（Vocabulary Card）
+
+欄位包含： word、partOfSpeech（詞性）
+KK 音標（kkPhonetic）、IPA（ipaPhonetic 作為後備）
+vowelNotes（母音變化與最小對立詞例：sit / seat）
+rootPrefix（字根/字首記憶法）
+examples（例句：含中文翻譯、時態/文法說明）
+audioUrl（TTS 或人工錄音）
+tags（主題/場所/難度/學段）
+例： park（n.）KK：[pɑrk]；例句：We played in the park after school.（一般現在時；介詞片語 in the park）
+bus（n.）KK：[bʌs]；例句：I take the bus to school.（一般現在時；動詞 take 與受詞）
+註：KK 音標以美式音系標記；若無可靠 KK 來源，系統以 IPA 替代，並標示「來源」。
+4.3 句型與文法（Sentence & Grammar）
+
+每個情境任務附：核心句型（e.g., Asking for directions）、文法提示（祈使句、介詞 in/on/at）、時態標記。
+句子評量：選擇題、填空題、自由輸入（NLP 輔助評分）。
+4.4 語音與發音
+
+TTS：美式英語男/女聲（可切換）。
+STT：語音辨識 + 自動斷句。
+發音評分：依音節/母音/重音給分與回饋（例如：提示 ɪ vs i 的差異）。
+4.5 遊戲化
+
+分數、等級、徽章（如「路線大師」、「發音達人」）。
+每日任務、連續簽到、週挑戰。
+學習時間管理（家長可設定上限）。
+4.6 後台（家長/教師）
+
+家長：查看孩子成果、時間限制、內容白名單。
+教師：建立課程包（地點→單字→句型→任務）、布置作業、班級進度報表。
+內容管理（CMS）：新增/編修單字卡、情境、音檔。
+
+
+5. 非功能需求（Non-Functional Requirements）
+
+效能：地圖操作 < 300ms 互動回應；TTS/STT 延遲 < 1.5s。
+可用性：SLA 99.9%（雲端服務）；前端支援低端裝置與弱網（基本快取）。
+擴充性：資料與內容可新增語言（將來支援多語），可水平擴展。
+可近用性：符合 WCAG 2.1 AA（色彩對比、鍵盤操作、字幕/轉寫）。
+隱私/合規：兒少保護（COPPA/GDPR-K），不精準追蹤實際位置，僅用「模擬地圖」或「校園/城市通用場景」。
+
+
+6. 技術架構（Architecture）
+6.1 前端
+
+Web：React + TypeScript（PWA），地圖 SDK：Azure Maps Web Control。
+Mobile：React Native 或 Flutter；封裝地圖與語音能力。
+國際化：i18n（中文介面 + 英文內容）；字型與音標顯示優化。
+6.2 後端與服務
+
+API：Node.js/Express；REST。
+身分：Azure AD B2C（家長/教師/學生分權）；未成年必需監護人同意。
+資料： 內容：Azure Cosmos DB（課程/單字卡/任務）
+使用者/進度：Azure SQL Database
+媒體：Azure Blob Storage（音檔、圖片）
+快取/CDN：Azure CDN + Front Door
+地圖：Azure Maps（地圖渲染、POI 標註、路線）
+語音：Azure Cognitive Services Speech（TTS/STT/Pronunciation）
+監控：Azure Application Insights（遙測/效能/例外）
+風險控管：KK 音標來源需授權（見 §13 風險與緩解）。
+
+
+7. 資料模型（Data Model）
+7.1 Vocabulary（單字卡）
+{
+  "id": "word_park_001",
+  "word": "park",
+  "partOfSpeech": "noun",
+  "kkPhonetic": "[pɑrk]",
+  "ipaPhonetic": "/pɑːrk/",
+  "vowelNotes": [
+    {"vowel": "ɑ", "contrast": [{"word": "park", "sound": "ɑ"}, {"word": "perk", "sound": "ɝ"}], "tip": "後母音 ɑ 與捲舌 ɝ 的差異"},
+    {"vowel": "æ", "contrast": [{"word": "cat", "sound": "æ"}, {"word": "cot", "sound": "ɑ"}], "tip": "口形與舌位差異"}
+  ],
+  "rootPrefix": [
+    {"type": "prefix", "value": "re-", "meaning": "again", "memo": "repeat, return, review"},
+    {"type": "root", "value": "port", "meaning": "carry", "memo": "transport, export, import"}
+  ],
+  "examples": [
+    {
+      "sentence": "We played in the park after school.",
+      "translationZh": "我們放學後在公園玩。",
+      "grammar": {"tense": "simple_present", "note": "介詞片語 in the park"}
+    }
+  ],
+  "audioUrl": "https://cdn.example.com/audio/park.mp3",
+  "tags": ["place", "outdoor", "A1"]
+}
+``
+
+7.2 Lesson（課程包）
+{
+  "id": "lesson_city_001",
+  "title": "City Explorer: Park & Library",
+  "ageBand": "9-12",
+  "poiList": [
+    {"poiId": "poi_park_01", "wordId": "word_park_001"},
+    {"poiId": "poi_library_02", "wordId": "word_library_001"}
+  ],
+  "tasks": [
+    {"type": "route", "fromPoi": "poi_school_01", "toPoi": "poi_library_02", "goal": "Find the shortest route"},
+    {"type": "dialogue", "scenario": "Ask for directions at the bus stop"}
+  ]
+}
+
+
+7.3 Progress（學習進度）
+{
+  "userId": "student_123",
+  "lessonId": "lesson_city_001",
+  "completedTasks": ["task_001", "task_002"],
+  "pronunciationScores": [{"wordId": "word_park_001", "score": 86}],
+  "points": 120,
+  "badges": ["route_master"]
+}
+``
+
+
+
+8. API 設計（API Design，REST）
+8.1 認證
+
+OAuth2 / OpenID Connect（Azure AD B2C）
+角色：student, parent, teacher, admin
+8.2 端點範例
+GET /api/lessons?ageBand=9-12
+GET /api/lessons/{id}
+POST /api/progress
+GET /api/vocab/{wordId}
+GET /api/poi?city=taipei
+POST /api/pronunciation/score   // 上傳音檔 → 回傳音素級評分
+``
+
+回應格式：JSON（UTF-8）
+
+
+9. 前端 UX 流程（依年齡分層）
+9.1 4–8 歲
+
+彩色大圖示 + 大按鈕 → 點地點 → 播放發音 → 圖片配對遊戲。
+介面文字少、以圖像化/音訊引導為主。
+9.2 9–12 歲
+
+顯示簡易地圖任務 → 規劃路線 → 完成後解鎖單字卡 + 簡單句型練習。
+小測與即時回饋（正確/提示/再試一次）。
+9.3 13–16 歲
+
+任務更複雜：行程規劃、問路對話、時間估算。
+文法重點：介系詞、祈使句、條件句、現在完成式（標註時態與功能）。
+
+
+10. 隱私與合規（Children Privacy & Compliance）
+
+資料最小化：不蒐集精準定位；使用「通用場景地圖」或模擬城市。
+監護人同意：註冊需家長認證；可設定學習時段與內容等級。
+合規參考：COPPA、GDPR-K；隱私政策與家長控制面板。
+安全：HTTPS / TLS、資料加密、RBAC、審計與異常告警。
+
+
+11. 內容策略（Content Strategy）
+
+依 CEFR（A1–B2）分級，對應年齡段。
+每個單字卡固定欄位：KK 音標、IPA（後備）、母音對比、字根字首、例句（詞性/時態/文法）。
+來源與版權：採用授權字典/自建語料庫；KK 音標需確認授權條款。
+TTS 以標準美式發音；關鍵單字提供真人錄音（提升自然度）。
+本地化介面：中文 UI；英語內容；術語說明可切換中文註解。
+
+
+12. 遊戲化設計（Game Economy）
+
+分數：完成任務、正確回答、發音達標。
+徽章：里程碑（10 條路線、50 個單字、連續 14 天）。
+每日任務：3 個循環挑戰（POI 找詞、路線規劃、對話練習）。
+排行榜：僅班級/家庭內（避免公共競賽壓力）。
+
+
+13. 風險與緩解（Risks & Mitigations）
+
+KK 音標版權：來源需授權（建議同時保存 IPA，並標示來源）；短期以 IPA 為主、KK 為增強資料。
+語音評分準確度：初期以單詞級評分，逐步擴大到句子級；提供人工示範音檔。
+兒少隱私：禁用精準定位；場景以「虛擬城市/校園」為主。
+裝置效能差異：PWA 快取與簡化模式；媒體自適應碼率。
+
+
+14. 測試計畫（Testing Plan）
+
+單元測試：API、資料模型、TTS/STT 封裝。
+整合測試：地圖 + 任務流程；內容載入；發音評分回傳。
+E2E 測試：Cypress（Web）／Detox（RN）。
+可近用性測試：鍵盤操作、螢幕閱讀器、色彩對比。
+在地化測試：中文介面、英語內容顯示（KK/IPA 字型與排版）。
+負載測試：地圖互動高峰、音訊上傳併發。
+
+
+15. 部署與 DevOps（Deployment & DevOps）
+
+環境：Dev / Staging / Prod（獨立資源群組）。
+CI/CD：GitHub Actions 或 Azure DevOps Pipelines（建置/測試/部署）。
+版本控管：Semantic Versioning；Feature Flags 控制新功能釋出。
+監控：Application Insights（APM、Log、Usage）；告警與儀表板。
+
+
+16. 里程碑（Milestones，6 個月建議）
+
+M1（第 1–4 週）：需求凍結、原型（POC：地圖 + 單字卡 + TTS）。
+M2（第 5–8 週）：資料模型/後端 API 基礎、POI 與路線任務。
+M3（第 9–12 週）：發音評分、遊戲化、家長/教師後台初版。
+M4（第 13–16 週）：內容填充（A1–A2 500 單字）、E2E 測試與調優。
+M5（第 17–20 週）：可近用性/在地化、隱私合規審查、試點班級。
+M6（第 21–24 週）：上線（Prod）、持續內容擴充與教學回饋迭代。
+
+
+17. 成功指標（KPIs）
+
+7 日留存 ≥ 35%；30 日留存 ≥ 20%。
+每週平均完成任務數 ≥ 10。
+發音評分平均提升 ≥ 15%（4 週）。
+每課平均完成時間 8–12 分鐘（流暢不過長）。
+
+
+18. 開放議題（Open Questions）
+
+KK 音標來源是否已有既有授權字典（或偏好出版社）？若無，是否接受首版以 IPA 為主、KK 為補充？
+UI 語言是否固定為繁體中文（家長/教師）＋英語學習內容？是否需要簡體/英語介面選項？
+是否需要離線模式（弱網環境的基本緩存）？
+是否需與校務系統或 M365 帳號整合（班級導入/分發）？
+
+
+19. 附錄：內容樣例（針對你的教學偏好）
+19.1 單字卡樣例（含 KK、母音、字根字首、例句）
+
+單字	詞性	KK 音標	IPA	母音對比（最小對立）	字根/字首記憶	例句（含文法說明）
+park	n.	[pɑrk]	/pɑːrk/	park [ɑ] vs perk [ɝ]	re-（again）、port（carry）→ report/export	We played in the park after school.（一般現在；介詞 in）
+bus	n.	[bʌs]	/bʌs/	bus [ʌ] vs boss [ɔ]	trans-（across）→ transport	I take the bus to school.（一般現在；動詞 take）
+library	n.	[ˋlaɪbrɛrɪ]（來源依字典可能異）	/ˈlaɪ.brer.i/	lie [aɪ] → library	-	The library opens at nine.（一般現在；主動/第三人稱）
+museum	n.	[mjuˋzɪəm]	/mjuːˈziːəm/	music vs museum（[ju]）	-	Is the museum far from here?（be 動詞疑問句）
+
+說明：KK 標記在不同字典可能有細微差異；系統將同時保存 IPA，並在介面標示音標來源。
+19.2 句型模組樣例（含詞性/時態/文法註解）
+
+Asking for directions（問路）句型：Excuse me, how can I get to the museum?
+文法：禮貌表達（Excuse me）、疑問句語序（助動詞 can + 主詞 + 動詞原形）。
+Giving directions（指路）句型：Go straight and turn left at the library.
+文法：祈使句（省略主詞）、介詞 at（地點）。
+
+
+19.3 任務腳本樣例（地圖 + 英語）
+{
+  "taskId": "task_route_001",
+  "type": "route",
+  "instruction": "Find the shortest route to the library.",
+  "poiFrom": "poi_school_01",
+  "poiTo": "poi_library_02",
+  "successCriteria": ["Route computed", "Student explains route using Go straight / Turn left"],
+  "rewardPoints": 20
+}
+``
+
+
+
+如果你願意，我可以把這份規格書轉成 Word 或 PDF（含封面、目錄與附圖），或是再補一份系統架構圖與 API 合約（OpenAPI），並依你偏好的 KK 音標來源做微調。
+你也可以先告訴我：「是否已有指定字典/授權來源」、「是否需要家庭/班級導入」，我會幫你把 §11 與 §18 的內容規範成可直接上 CMS 的資料欄位清單與導入模板（CSV/Excel）。
+
+
+20. API 合約（OpenAPI 3.1）
+本節提供可直接匯入 Postman/Stoplight/Swagger UI 的 OpenAPI 3.1 YAML，涵蓋前述規格書中的公開 API。欄位與資料模型（Vocabulary／Lesson／Progress／Pronunciation／POI）已對齊 §7 與 §8 的定義。
+openapi: 3.1.0
+info:
+  title: MapWords API
+  version: 1.0.0
+  description: |
+    MapWords（結合地圖的英語學習）後端服務 API。
+    功能包含課程、單字卡（含 KK 音標／IPA／母音對比／字根字首）、
+    學習進度、發音評分，以及 POI／路線任務。
+  contact:
+    name: MapWords Team
+    url: https://example.com/support
+servers:
+  - url: https://api.mapwords.dev
+    description: 開發環境
+  - url: https://api.mapwords.stg
+    description: 測試／預備環境
+  - url: https://api.mapwords.prod
+    description: 正式環境
+security:
+  - OAuth2: [ "api://mapwords/read", "api://mapwords/write" ]
+
+tags:
+  - name: Lessons
+    description: 課程包與任務
+  - name: Vocabulary
+    description: 單字卡（KK／IPA／例句／字根字首）
+  - name: Progress
+    description: 學習進度與分數、徽章
+  - name: Pronunciation
+    description: 發音上傳與評分
+  - name: POI
+    description: 地圖 POI 與查詢
+
+paths:
+  /api/lessons:
+    get:
+      tags: [ Lessons ]
+      summary: 依學段或標籤查詢課程包
+      operationId: listLessons
+      parameters:
+        - name: ageBand
+          in: query
+          description: 年齡分段（4-8 / 9-12 / 13-16）
+          schema:
+            type: string
+            enum: [ "4-8", "9-12", "13-16" ]
+        - name: tag
+          in: query
+          description: 課程標籤（e.g., city, campus）
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lesson"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/lessons/{id}:
+    get:
+      tags: [ Lessons ]
+      summary: 取得課程包詳情
+      operationId: getLesson
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/vocab/{wordId}:
+    get:
+      tags: [ Vocabulary ]
+      summary: 取得單字卡（含 KK／IPA／例句／母音註記）
+      operationId: getVocabulary
+      parameters:
+        - name: wordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VocabularyCard"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/poi:
+    get:
+      tags: [ POI ]
+      summary: 查詢教學用地圖 POI
+      operationId: listPoi
+      parameters:
+        - name: city
+          in: query
+          description: 城市（例如 taipei）
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: 類別（public/transport/nature/store 等）
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/POI"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/progress:
+    post:
+      tags: [ Progress ]
+      summary: 回寫學習進度（完成任務／分數／徽章）
+      operationId: updateProgress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgressUpdate"
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Progress"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/progress/{lessonId}:
+    get:
+      tags: [ Progress ]
+      summary: 取得使用者在指定課程的進度
+      operationId: getProgress
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Progress"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/pronunciation/score:
+    post:
+      tags: [ Pronunciation ]
+      summary: 上傳音檔並取得發音評分（字／句）
+      operationId: scorePronunciation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: 音檔（wav/webm/mp3）
+                wordId:
+                  type: string
+                  description: 要評分的單字 ID（與 sentence 二選一）
+                sentence:
+                  type: string
+                  description: 要評分的句子（與 wordId 二選一）
+                language:
+                  type: string
+                  enum: [ en-US ]
+                  default: en-US
+              required: [ audio ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PronunciationResult"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://{tenant}.b2clogin.com/{tenant}.onmicrosoft.com/{policy}/oauth2/v2.0/authorize
+          tokenUrl: https://{tenant}.b2clogin.com/{tenant}.onmicrosoft.com/{policy}/oauth2/v2.0/token
+          scopes:
+            api://mapwords/read: 讀取基本資料
+            api://mapwords/write: 寫入進度與作答
+
+  responses:
+    Unauthorized:
+      description: 未授權
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: 找不到資源
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadRequest:
+      description: 請求不合法
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+      required: [ code, message ]
+
+    VocabularyCard:
+      type: object
+      properties:
+        id: { type: string }
+        word: { type: string }
+        partOfSpeech: { type: string }
+        kkPhonetic: { type: string, description: "KK 音標，如 [pɑrk]" }
+        ipaPhonetic: { type: string, description: "IPA 音標，如 /pɑːrk/" }
+        vowelNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VowelNote"
+        rootPrefix:
+          type: array
+          items:
+            $ref: "#/components/schemas/RootPrefix"
+        examples:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExampleSentence"
+        audioUrl: { type: string, format: uri }
+        tags:
+          type: array
+          items: { type: string }
+      required: [ id, word, partOfSpeech ]
+
+    ExampleSentence:
+      type: object
+      properties:
+        sentence: { type: string }
+        translationZh: { type: string }
+        grammar:
+          type: object
+          properties:
+            tense: { type: string, enum: [ simple_present, simple_past, present_continuous, present_perfect ] }
+            note: { type: string }
+
+    VowelNote:
+      type: object
+      properties:
+        vowel: { type: string }
+        contrast:
+          type: array
+          items:
+            type: object
+            properties:
+              word: { type: string }
+              sound: { type: string }
+        tip: { type: string }
+
+    RootPrefix:
+      type: object
+      properties:
+        type: { type: string, enum: [ prefix, root, suffix ] }
+        value: { type: string }
+        meaning: { type: string }
+        memo: { type: string }
+
+    POI:
+      type: object
+      properties:
+        poiId: { type: string }
+        name: { type: string }
+        category: { type: string }
+        longitude: { type: number }
+        latitude: { type: number }
+        wordId: { type: string, description: "此 POI 對應的單字卡（可選）" }
+
+    Lesson:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        ageBand: { type: string, enum: [ "4-8", "9-12", "13-16" ] }
+        poiList:
+          type: array
+          items:
+            type: object
+            properties:
+              poiId: { type: string }
+              wordId: { type: string }
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/LessonTask"
+      required: [ id, title ]
+
+    LessonTask:
+      type: object
+      properties:
+        type: { type: string, enum: [ route, dialogue, quiz ] }
+        fromPoi: { type: string }
+        toPoi: { type: string }
+        goal: { type: string }
+        scenario: { type: string }
+
+    ProgressUpdate:
+      type: object
+      properties:
+        userId: { type: string }
+        lessonId: { type: string }
+        completedTasks:
+          type: array
+          items: { type: string }
+        pronunciationScores:
+          type: array
+          items:
+            $ref: "#/components/schemas/PronunciationScore"
+        points: { type: integer }
+        badges:
+          type: array
+          items: { type: string }
+      required: [ userId, lessonId ]
+
+    Progress:
+      allOf:
+        - $ref: "#/components/schemas/ProgressUpdate"
+
+    PronunciationScore:
+      type: object
+      properties:
+        wordId: { type: string }
+        score: { type: integer, minimum: 0, maximum: 100 }
+
+    PronunciationResult:
+      type: object
+      properties:
+        overallScore: { type: integer, minimum: 0, maximum: 100 }
+        detail:
+          type: object
+          properties:
+            mode: { type: string, enum: [ word, sentence ] }
+            target: { type: string, description: "評分目標（wordId 或 sentence）" }
+        phonemeScores:
+          type: array
+          items:
+            type: object
+            properties:
+              phoneme: { type: string }
+              score: { type: integer, minimum: 0, maximum: 100 }
+              feedback: { type: string }
+
+x-examples:
+  VocabularyCard:
+    example:
+      id: "word_park_001"
+      word: "park"
+      partOfSpeech: "noun"
+      kkPhonetic: "[pɑrk]"
+      ipaPhonetic: "/pɑːrk/"
+      vowelNotes:
+        - vowel: "ɑ"
+          contrast:
+            - { word: "park", sound: "ɑ" }
+            - { word: "perk", sound: "ɝ" }
+          tip: "後母音 ɑ 與捲舌 ɝ 的差異"
+      rootPrefix:
+        - { type: "prefix", value: "re-", meaning: "again", memo: "repeat, review" }
+      examples:
+        - sentence: "We played in the park after school."
+          translationZh: "我們放學後在公園玩。"
+          grammar: { tense: "simple_present", note: "介詞片語 in the park" }
+      audioUrl: "https://cdn.example.com/audio/park.mp3"
+      tags: [ "place", "outdoor", "A1" ]
+
+
+
+使用方式
+：將上述 YAML 貼入
+openapi.yaml
+，即可用 Swagger UI/Stoplight/Postman 匯入並測試。若你要我幫你
+產生可下載的 JSON 版
+或
+附上 Swagger UI HTML
+，我可以直接幫你建立檔案。
