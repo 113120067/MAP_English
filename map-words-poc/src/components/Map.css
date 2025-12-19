@@ -1,0 +1,10 @@
+.map-container {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+}
+
+/* Ensure Azure Maps copyright/logo is visible */
+.azure-map-copyright {
+    font-size: 10px;
+}
